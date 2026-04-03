@@ -6,8 +6,12 @@
 <meta name="theme-color" content="#0a0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Slidex Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="favicon.svg">
 <meta property="og:title" content="Slidex Dashboard">
 <meta property="og:description" content="Slidex Project Task Management">
+<meta property="og:image" content="https://tomokinozawa.github.io/slidex-dashboard/favicon.svg">
+<meta property="og:url" content="https://tomokinozawa.github.io/slidex-dashboard/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -398,6 +402,50 @@ html, body {
 /* ============ KEYBOARD SHORTCUT HINT ============ */
 .kbd { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border); font-family: monospace; }
 
+/* ============ PRESENCE ============ */
+.presence-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 20px; background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-muted);
+}
+.presence-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-green); display: inline-block; }
+.presence-avatars { display: flex; margin-left: 6px; }
+.presence-avatars img {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--bg-secondary); margin-left: -6px;
+}
+.presence-avatars img:first-child { margin-left: 0; }
+
+/* ============ COMMENTS ============ */
+.comments-section { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
+.comments-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+.comment-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+.comment-item { display: flex; gap: 8px; font-size: 12px; }
+.comment-avatar { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; }
+.comment-body { flex: 1; }
+.comment-author { font-weight: 600; color: var(--text-primary); }
+.comment-text { color: var(--text-secondary); margin-top: 2px; line-height: 1.4; }
+.comment-time { color: var(--text-muted); font-size: 10px; }
+.comment-input-row { display: flex; gap: 8px; margin-top: 8px; }
+.comment-input-row input {
+  flex: 1; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-input);
+  color: var(--text-primary); font-size: 12px; font-family: inherit;
+}
+.comment-input-row input:focus { outline: none; border-color: var(--accent-blue); }
+.comment-send-btn {
+  padding: 6px 12px; border-radius: 8px; border: none;
+  background: var(--accent-blue); color: #fff; font-size: 12px;
+  cursor: pointer; transition: var(--transition);
+}
+.comment-send-btn:hover { opacity: 0.9; }
+
+/* ============ DROP INDICATOR ============ */
+.drop-indicator {
+  height: 3px; background: var(--accent-blue); border-radius: 2px;
+  margin: -2px 0; transition: opacity 0.15s;
+}
+
 /* ============ RESPONSIVE ============ */
 @media (max-width: 768px) {
   .kanban-board { grid-template-columns: 1fr; }
@@ -407,6 +455,8 @@ html, body {
   .filter-bar { overflow-x: auto; flex-wrap: nowrap; }
   .user-name { display: none; }
   .header-title { font-size: 15px; }
+  .column-body:last-child { padding-bottom: env(safe-area-inset-bottom, 0); }
+  .app-header { padding-top: env(safe-area-inset-top, 10px); }
 }
 
 /* ============ SCROLLBAR ============ */
@@ -458,6 +508,13 @@ html, body {
     </div>
   </div>
 
+  <!-- Presence Bar -->
+  <div class="presence-bar" id="presenceBar">
+    <span class="presence-dot"></span>
+    <span id="presenceCount">0</span>人がオンライン
+    <div class="presence-avatars" id="presenceAvatars"></div>
+  </div>
+
   <!-- Stats Bar -->
   <div class="stats-bar">
     <div class="stat-item active" data-filter="all" onclick="filterByStatus('all', this)">
@@ -501,7 +558,7 @@ html, body {
           </div>
           <button class="column-add-btn" onclick="openCreateModal('todo')">+</button>
         </div>
-        <div class="column-body" id="bodyTodo" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'todo')"></div>
+        <div class="column-body" id="bodyTodo" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDropReorder(event, 'todo')"></div>
       </div>
       <div class="kanban-column" data-status="doing" id="colDoing">
         <div class="column-header">
@@ -512,7 +569,7 @@ html, body {
           </div>
           <button class="column-add-btn" onclick="openCreateModal('doing')">+</button>
         </div>
-        <div class="column-body" id="bodyDoing" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'doing')"></div>
+        <div class="column-body" id="bodyDoing" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDropReorder(event, 'doing')"></div>
       </div>
       <div class="kanban-column" data-status="done" id="colDone">
         <div class="column-header">
@@ -522,7 +579,7 @@ html, body {
             <span class="column-count" id="cntDone">0</span>
           </div>
         </div>
-        <div class="column-body" id="bodyDone" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'done')"></div>
+        <div class="column-body" id="bodyDone" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDropReorder(event, 'done')"></div>
       </div>
     </div>
   </div>
@@ -584,6 +641,15 @@ html, body {
       <div>
         <label>期限</label>
         <input id="taskDueInput" type="date">
+      </div>
+      <!-- Comments (shown only when editing) -->
+      <div class="comments-section" id="commentsSection" style="display:none;">
+        <div class="comments-title">コメント</div>
+        <div class="comment-list" id="commentList"></div>
+        <div class="comment-input-row">
+          <input id="commentInput" placeholder="コメントを入力..." onkeydown="if(event.key==='Enter'){event.preventDefault();addComment();}">
+          <button class="comment-send-btn" onclick="addComment()">送信</button>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -808,6 +874,8 @@ async function initFirebase() {
 
   listenTasks();
   listenUsers();
+  startPresence();
+  listenPresence();
 }
 
 function listenTasks() {
@@ -901,7 +969,7 @@ function renderColumn(bodyId, countId, items) {
           <button class="swipe-action swipe-action-status" onclick="moveTask('${task.id}','${nextStatus}')">${nextLabel}</button>
           <button class="swipe-action swipe-action-delete" onclick="openDeleteModal('${task.id}')">🗑</button>
         </div>
-        <div class="swipe-content task-card" draggable="true" ondragstart="handleDragStart(event,'${task.id}')" ondragend="handleDragEnd(event)" onclick="openEditModal('${task.id}')">
+        <div class="swipe-content task-card" data-task-id="${task.id}" draggable="true" ondragstart="handleDragStart(event,'${task.id}')" ondragend="handleDragEnd(event)" ondragover="handleDragOverCard(event,'${task.id}')" onclick="openEditModal('${task.id}')">
           <div class="task-priority-bar" style="background:${priorityColor}"></div>
           <div class="task-header">
             <span class="task-title">${escHtml(task.title || '')}</span>
@@ -1027,6 +1095,7 @@ function openCreateModal(status) {
   document.getElementById('taskAssigneeInput').value = '';
   document.getElementById('taskStatusInput').value = status || 'todo';
   document.getElementById('taskDueInput').value = '';
+  document.getElementById('commentsSection').style.display = 'none';
   document.getElementById('taskModal').classList.add('show');
   setTimeout(() => document.getElementById('taskTitleInput').focus(), 100);
 }
@@ -1044,11 +1113,13 @@ function openEditModal(taskId) {
   document.getElementById('taskAssigneeInput').value = task.assignee_id || '';
   document.getElementById('taskStatusInput').value = task.status || 'todo';
   document.getElementById('taskDueInput').value = task.due_date || '';
+  loadComments(taskId);
   document.getElementById('taskModal').classList.add('show');
   setTimeout(() => document.getElementById('taskTitleInput').focus(), 100);
 }
 
 function closeModal() {
+  if (editingTaskId) unloadComments(editingTaskId);
   document.getElementById('taskModal').classList.remove('show');
   editingTaskId = null;
 }
@@ -1118,11 +1189,7 @@ function handleDragOver(e) {
 function handleDragLeave(e) {
   e.currentTarget.classList.remove('drag-over');
 }
-function handleDrop(e, newStatus) {
-  e.preventDefault();
-  e.currentTarget.classList.remove('drag-over');
-  if (draggedTaskId) moveTask(draggedTaskId, newStatus);
-}
+
 
 // ============ MOBILE SWIPE ============
 const SWIPE_THRESHOLD = 30;
@@ -1224,6 +1291,119 @@ document.addEventListener('keydown', e => {
     submitTask();
   }
 });
+
+// ============ PRESENCE ============
+let presenceInterval = null;
+function startPresence() {
+  const user = getUserInfo();
+  if (!user.id || !db) return;
+  const ref = db.ref(`${DB_PREFIX}/presence/${user.id}`);
+  ref.set({ name: user.name, avatar: user.avatar, online: true, last_seen: firebase.database.ServerValue.TIMESTAMP });
+  ref.onDisconnect().set({ name: user.name, avatar: user.avatar, online: false, last_seen: firebase.database.ServerValue.TIMESTAMP });
+  // Heartbeat every 60s
+  presenceInterval = setInterval(() => {
+    ref.update({ last_seen: firebase.database.ServerValue.TIMESTAMP });
+  }, 60000);
+}
+
+function listenPresence() {
+  db.ref(`${DB_PREFIX}/presence`).on('value', snap => {
+    const all = snap.val() || {};
+    const now = Date.now();
+    const online = Object.entries(all).filter(([, v]) => v.online && (now - (v.last_seen || 0)) < 120000);
+    document.getElementById('presenceCount').textContent = online.length;
+    const avatarsEl = document.getElementById('presenceAvatars');
+    avatarsEl.innerHTML = online.map(([, v]) => `<img src="${escHtml(v.avatar || '')}" title="${escHtml(v.name || '')}">`).join('');
+  });
+}
+
+// ============ COMMENTS ============
+function loadComments(taskId) {
+  const section = document.getElementById('commentsSection');
+  const list = document.getElementById('commentList');
+  if (!taskId) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  db.ref(`${DB_PREFIX}/comments/${taskId}`).on('value', snap => {
+    const comments = snap.val() || {};
+    const sorted = Object.entries(comments).sort((a, b) => (a[1].created_at || 0) - (b[1].created_at || 0));
+    list.innerHTML = sorted.map(([, c]) => {
+      const u = users[c.user_id] || {};
+      const time = c.created_at ? new Date(c.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+      return `<div class="comment-item">
+        <img class="comment-avatar" src="${escHtml(u.avatar || '')}" alt="">
+        <div class="comment-body">
+          <span class="comment-author">${escHtml(u.name || c.user_id)}</span>
+          <span class="comment-time">${time}</span>
+          <div class="comment-text">${escHtml(c.text || '')}</div>
+        </div>
+      </div>`;
+    }).join('') || '<div style="color:var(--text-muted);font-size:12px;">コメントなし</div>';
+    list.scrollTop = list.scrollHeight;
+  });
+}
+
+function unloadComments(taskId) {
+  if (taskId) db.ref(`${DB_PREFIX}/comments/${taskId}`).off('value');
+}
+
+async function addComment() {
+  const input = document.getElementById('commentInput');
+  const text = input.value.trim();
+  if (!text || !editingTaskId) return;
+  const user = getUserInfo();
+  await db.ref(`${DB_PREFIX}/comments/${editingTaskId}`).push({
+    text,
+    user_id: user.id || '',
+    created_at: firebase.database.ServerValue.TIMESTAMP,
+  });
+  input.value = '';
+}
+
+// ============ DRAG & DROP (REORDER WITHIN COLUMN) ============
+let dropTargetId = null;
+
+function handleDragOverCard(e, taskId) {
+  e.preventDefault();
+  e.stopPropagation();
+  dropTargetId = taskId;
+  // Remove existing indicators
+  document.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+  const card = e.currentTarget;
+  const rect = card.getBoundingClientRect();
+  const isAbove = e.clientY < rect.top + rect.height / 2;
+  const indicator = document.createElement('div');
+  indicator.className = 'drop-indicator';
+  if (isAbove) card.parentNode.insertBefore(indicator, card);
+  else card.parentNode.insertBefore(indicator, card.nextSibling);
+}
+
+function handleDropReorder(e, columnStatus) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  document.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+  if (!draggedTaskId) return;
+
+  // Get ordered task IDs in this column after drop
+  const body = e.currentTarget;
+  const cards = [...body.querySelectorAll('[data-task-id]')];
+  const draggedStatus = tasks[draggedTaskId]?.status;
+
+  // Update status if moving between columns
+  const updates = {};
+  if (draggedStatus !== columnStatus) {
+    updates[`${DB_PREFIX}/tasks/${draggedTaskId}/status`] = columnStatus;
+    updates[`${DB_PREFIX}/tasks/${draggedTaskId}/updated_at`] = firebase.database.ServerValue.TIMESTAMP;
+  }
+
+  // Reorder: assign new order values
+  if (dropTargetId && dropTargetId !== draggedTaskId) {
+    const targetOrder = tasks[dropTargetId]?.order || Date.now();
+    updates[`${DB_PREFIX}/tasks/${draggedTaskId}/order`] = targetOrder + 1;
+  }
+
+  if (Object.keys(updates).length) db.ref().update(updates);
+  dropTargetId = null;
+}
 
 // ============ UTILS ============
 function escHtml(str) {

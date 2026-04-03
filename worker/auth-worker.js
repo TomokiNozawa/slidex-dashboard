@@ -36,7 +36,76 @@ export default {
       return json({ error: e.message }, 500);
     }
   },
+
+  // Cron trigger: check overdue/upcoming tasks daily at 9:00 JST
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(checkDueTasks(env));
+  },
 };
+
+async function checkDueTasks(env) {
+  const dbUrl = env.FIREBASE_DB_URL || 'https://task-board-fbf1e-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+  // Get all slidex tasks
+  const res = await fetch(`${dbUrl}/slidex/tasks.json`);
+  const tasks = await res.json();
+  if (!tasks) return;
+
+  // Get users for assignee names
+  const uRes = await fetch(`${dbUrl}/slidex/users.json`);
+  const users = await uRes.json() || {};
+
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+  const alerts = [];
+  for (const [id, task] of Object.entries(tasks)) {
+    if (task.status === 'done' || !task.due_date) continue;
+    const assignee = task.assignee_id && users[task.assignee_id] ? users[task.assignee_id].name : null;
+    if (task.due_date < todayStr) {
+      alerts.push({ type: 'overdue', task, assignee });
+    } else if (task.due_date === todayStr) {
+      alerts.push({ type: 'today', task, assignee });
+    } else if (task.due_date === tomorrowStr) {
+      alerts.push({ type: 'tomorrow', task, assignee });
+    }
+  }
+
+  if (!alerts.length) return;
+
+  // Build Slack message
+  const lines = ['*Slidex タスクリマインド*\n'];
+  const overdue = alerts.filter(a => a.type === 'overdue');
+  const todayTasks = alerts.filter(a => a.type === 'today');
+  const tomorrowTasks = alerts.filter(a => a.type === 'tomorrow');
+
+  if (overdue.length) {
+    lines.push(':rotating_light: *期限超過*');
+    overdue.forEach(a => lines.push(`  - ${a.task.title}${a.assignee ? ` (${a.assignee})` : ''} — 〆${a.task.due_date}`));
+  }
+  if (todayTasks.length) {
+    lines.push(':warning: *今日期限*');
+    todayTasks.forEach(a => lines.push(`  - ${a.task.title}${a.assignee ? ` (${a.assignee})` : ''}`));
+  }
+  if (tomorrowTasks.length) {
+    lines.push(':clock3: *明日期限*');
+    tomorrowTasks.forEach(a => lines.push(`  - ${a.task.title}${a.assignee ? ` (${a.assignee})` : ''}`));
+  }
+
+  lines.push('\n<https://tomokinozawa.github.io/slidex-dashboard/|Dashboard>');
+
+  await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      channel: env.ALLOWED_CHANNEL_ID,
+      text: lines.join('\n'),
+    }),
+  });
+}
 
 function corsHeaders(env) {
   return {

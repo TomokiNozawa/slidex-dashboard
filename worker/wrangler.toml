@@ -1,3 +1,6 @@
 name = "slidex-auth"
 main = "auth-worker.js"
 compatibility_date = "2024-01-01"
+
+[triggers]
+crons = ["0 0 * * *"]  # Daily at 00:00 UTC = 09:00 JST
