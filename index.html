@@ -726,17 +726,29 @@ function isLoggedIn() {
   const jwt = localStorage.getItem(LS_PREFIX + 'jwt');
   if (!jwt) return false;
   try {
-    const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    const payload = JSON.parse(decodeBase64Url(jwt.split('.')[1]));
     return payload.exp > Date.now() / 1000;
   } catch { return false; }
+}
+
+function decodeBase64Url(str) {
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64 + '=='.slice(0, (4 - base64.length % 4) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
 }
 
 function getUserInfo() {
   const jwt = localStorage.getItem(LS_PREFIX + 'jwt');
   if (!jwt) return {};
   try {
-    const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-    return { id: payload.sub, name: payload.name, avatar: payload.avatar };
+    const payload = JSON.parse(decodeBase64Url(jwt.split('.')[1]));
+    // Prefer localStorage name (properly URL-decoded) over JWT-decoded name
+    const lsName = localStorage.getItem(LS_PREFIX + 'name');
+    const lsAvatar = localStorage.getItem(LS_PREFIX + 'avatar');
+    return { id: payload.sub, name: lsName || payload.name, avatar: lsAvatar || payload.avatar };
   } catch { return {}; }
 }
 
@@ -785,9 +797,11 @@ async function initFirebase() {
   // Register user in DB
   const user = getUserInfo();
   if (user.id) {
+    const lsName = localStorage.getItem(LS_PREFIX + 'name') || user.name || 'Unknown';
+    const lsAvatar = localStorage.getItem(LS_PREFIX + 'avatar') || user.avatar || '';
     db.ref(`${DB_PREFIX}/users/${user.id}`).update({
-      name: user.name || 'Unknown',
-      avatar: user.avatar || '',
+      name: lsName,
+      avatar: lsAvatar,
       last_seen: firebase.database.ServerValue.TIMESTAMP,
     });
   }
